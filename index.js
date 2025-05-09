@@ -31,7 +31,7 @@ const {
   
   // Almacenamiento temporal
   const userSelections = new Map();
-  const activePagers = new Map(); // messageId -> data
+  const activePagers = new Map(); // messageId -> pagerData
   
   client.on('interactionCreate', async interaction => {
     if (interaction.isChatInputCommand()) {
@@ -70,60 +70,93 @@ const {
       await interaction.showModal(modal);
     }
   
-    if (interaction.customId === 'modal_pager') {
-        const userId = interaction.user.id;
-        const data = userSelections.get(userId);
-      
-        if (!data || !data.roles) {
-          return interaction.reply({ content: '❌ No se pudo recuperar la información. Intentá de nuevo.', ephemeral: true });
-        }
-      
-        const situacion = interaction.fields.getTextInputValue('situacion');
-        const lugar = interaction.fields.getTextInputValue('lugar');
-        const estado = 'ACTIVO';
-      
-        const roleMentions = data.roles.map(id => `<@&${id}>`).join(' ');
-      
-        const embed = new EmbedBuilder()
-          .setTitle('📟 PAGER ENVIADO')
-          .setColor(0x2f3136)
-          .addFields(
-            { name: '👮‍♂️ Estado', value: estado, inline: true },
-            { name: '📍 Ubicación', value: lugar, inline: true },
-            { name: '📄 Situación', value: situacion, inline: false },
-            { name: '🔔 Notificados', value: roleMentions || 'Ninguno', inline: false }
-          )
-          .setFooter({ text: `Enviado por ${interaction.member?.nickname || interaction.user.username}` })
-          .setTimestamp();
-      
-        const buttons = new ActionRowBuilder().addComponents(
-          new ButtonBuilder()
-            .setCustomId('close_pager')
-            .setLabel('📴 Cerrar Pager')
-            .setStyle(ButtonStyle.Danger),
-          new ButtonBuilder()
-            .setCustomId('responder_pager')
-            .setLabel('✅ Responder')
-            .setStyle(ButtonStyle.Success)
-        );
-      
-        await interaction.reply({
-          content: roleMentions, // 🔔 Aquí se activan las notificaciones
-          embeds: [embed],
-          components: [buttons],
-          allowedMentions: { parse: ['roles'] }
-        });
-      
-        userSelections.set(userId, { ...data, situacion, lugar, estado, responded: [] });
+    if (interaction.isModalSubmit() && interaction.customId === 'modal_pager') {
+      const userId = interaction.user.id;
+      const data = userSelections.get(userId);
+  
+      if (!data || !data.roles) {
+        return interaction.reply({ content: '❌ No se pudo recuperar la información. Intentá de nuevo.', ephemeral: true });
       }
   
+      const situacion = interaction.fields.getTextInputValue('situacion');
+      const lugar = interaction.fields.getTextInputValue('lugar');
+      const estado = 'ACTIVO';
+      const roleMentions = data.roles.map(id => `<@&${id}>`).join(' ');
+  
+      const embed = new EmbedBuilder()
+        .setTitle('📟 PAGER ENVIADO')
+        .setColor(0x2f3136)
+        .addFields(
+          { name: '👮‍♂️ Estado', value: estado, inline: true },
+          { name: '📍 Ubicación', value: lugar, inline: true },
+          { name: '📄 Situación', value: situacion, inline: false },
+          { name: '🔔 Notificados', value: roleMentions || 'Ninguno', inline: false },
+          { name: '✅ Respondieron', value: 'Ninguno', inline: false }
+        )
+        .setFooter({ text: `Enviado por ${interaction.member?.nickname || interaction.user.username}` })
+        .setTimestamp();
+  
+      const dummyId = 'pending_id'; // se sobreescribirá al enviar el mensaje
+  
+      const buttons = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+          .setCustomId(`responder_${dummyId}`)
+          .setLabel('✅ Responder')
+          .setStyle(ButtonStyle.Success),
+        new ButtonBuilder()
+          .setCustomId(`cerrar_${dummyId}`)
+          .setLabel('📴 Cerrar Pager')
+          .setStyle(ButtonStyle.Danger)
+      );
+  
+      const sent = await interaction.reply({
+        content: roleMentions,
+        embeds: [embed],
+        components: [buttons],
+        allowedMentions: { parse: ['roles'] }
+      });
+  
+      const msg = await interaction.fetchReply();
+      const msgId = msg.id;
+  
+      // Actualizar botones con el mensaje ID real
+      const updatedButtons = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+          .setCustomId(`responder_${msgId}`)
+          .setLabel('✅ Responder')
+          .setStyle(ButtonStyle.Success),
+        new ButtonBuilder()
+          .setCustomId(`cerrar_${msgId}`)
+          .setLabel('📴 Cerrar Pager')
+          .setStyle(ButtonStyle.Danger)
+      );
+  
+      await msg.edit({
+        embeds: [embed],
+        components: [updatedButtons]
+      });
+  
+      activePagers.set(msgId, {
+        embed,
+        roles: data.roles,
+        situacion,
+        lugar,
+        estado,
+        responders: []
+      });
+  
+      userSelections.delete(userId);
+    }
+  
     if (interaction.isButton()) {
-      const pagerData = activePagers.get(interaction.message.id);
+      const [action, pagerId] = interaction.customId.split('_');
+      const pagerData = activePagers.get(pagerId);
+  
       if (!pagerData) {
         return interaction.reply({ content: '⚠️ Este pager ya no está activo o no se encontró.', ephemeral: true });
       }
   
-      if (interaction.customId === 'responder_pager') {
+      if (action === 'responder') {
         if (!pagerData.responders.includes(interaction.user.id)) {
           pagerData.responders.push(interaction.user.id);
   
@@ -141,7 +174,7 @@ const {
         }
       }
   
-      if (interaction.customId === 'close_pager') {
+      if (action === 'cerrar') {
         pagerData.embed.setColor('Red');
         pagerData.embed.spliceFields(0, 1, { name: '👮‍♂️ Estado', value: 'CERRADO', inline: true });
   
@@ -150,7 +183,7 @@ const {
           components: []
         });
   
-        activePagers.delete(interaction.message.id);
+        activePagers.delete(pagerId);
       }
     }
   });
