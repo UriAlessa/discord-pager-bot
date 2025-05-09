@@ -70,64 +70,52 @@ const {
       await interaction.showModal(modal);
     }
   
-    if (interaction.isModalSubmit() && interaction.customId === 'modal_pager') {
-      const userId = interaction.user.id;
-      const data = userSelections.get(userId);
-      if (!data || !data.roles) {
-        return interaction.reply({ content: '❌ No se pudo recuperar la información. Intentá de nuevo.', ephemeral: true });
+    if (interaction.customId === 'modal_pager') {
+        const userId = interaction.user.id;
+        const data = userSelections.get(userId);
+      
+        if (!data || !data.roles) {
+          return interaction.reply({ content: '❌ No se pudo recuperar la información. Intentá de nuevo.', ephemeral: true });
+        }
+      
+        const situacion = interaction.fields.getTextInputValue('situacion');
+        const lugar = interaction.fields.getTextInputValue('lugar');
+        const estado = 'ACTIVO';
+      
+        const roleMentions = data.roles.map(id => `<@&${id}>`).join(' ');
+      
+        const embed = new EmbedBuilder()
+          .setTitle('📟 PAGER ENVIADO')
+          .setColor(0x2f3136)
+          .addFields(
+            { name: '👮‍♂️ Estado', value: estado, inline: true },
+            { name: '📍 Ubicación', value: lugar, inline: true },
+            { name: '📄 Situación', value: situacion, inline: false },
+            { name: '🔔 Notificados', value: roleMentions || 'Ninguno', inline: false }
+          )
+          .setFooter({ text: `Enviado por ${interaction.member?.nickname || interaction.user.username}` })
+          .setTimestamp();
+      
+        const buttons = new ActionRowBuilder().addComponents(
+          new ButtonBuilder()
+            .setCustomId('close_pager')
+            .setLabel('📴 Cerrar Pager')
+            .setStyle(ButtonStyle.Danger),
+          new ButtonBuilder()
+            .setCustomId('responder_pager')
+            .setLabel('✅ Responder')
+            .setStyle(ButtonStyle.Success)
+        );
+      
+        await interaction.reply({
+          content: roleMentions, // 🔔 Aquí se activan las notificaciones
+          embeds: [embed],
+          components: [buttons],
+          allowedMentions: { parse: ['roles'] }
+        });
+      
+        userSelections.set(userId, { ...data, situacion, lugar, estado, responded: [] });
       }
-  
-      const situacion = interaction.fields.getTextInputValue('situacion');
-      const lugar = interaction.fields.getTextInputValue('lugar');
-      const estado = 'ACTIVO';
-      const roleMentions = data.roles.map(id => `<@&${id}>`).join(' ');
-  
-      const responders = [];
-  
-      const embed = new EmbedBuilder()
-        .setTitle('📟 PAGER ENVIADO')
-        .setColor('Yellow')
-        .addFields(
-          { name: '👮‍♂️ Estado', value: estado, inline: true },
-          { name: '📍 Lugar', value: lugar, inline: true },
-          { name: '📄 Situación', value: situacion },
-          { name: '🔔 Notificado a', value: roleMentions },
-          { name: '✅ Respondieron', value: 'Nadie respondió aún.' }
-        )
-        .setFooter({ text: `Enviado por ${interaction.user.tag}`, iconURL: interaction.user.displayAvatarURL() })
-        .setTimestamp();
-  
-      const row = new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-          .setCustomId('responder_pager')
-          .setLabel('✅ Responder')
-          .setStyle(ButtonStyle.Success),
-        new ButtonBuilder()
-          .setCustomId('close_pager')
-          .setLabel('📴 Cerrar Pager')
-          .setStyle(ButtonStyle.Danger)
-      );
-  
-      await interaction.reply({
-        embeds: [embed],
-        components: [row],
-        allowedMentions: { parse: ['roles'] }
-      });
-      
-      const sentMessage = await interaction.fetchReply();
-    
-      
-      activePagers.set(sentMessage.id, {
-        responders,
-        embed,
-        roles: data.roles,
-        situacion,
-        lugar,
-        interactionUser: interaction.user
-      });
-  
-      userSelections.delete(userId);
-    }
   
     if (interaction.isButton()) {
       const pagerData = activePagers.get(interaction.message.id);
