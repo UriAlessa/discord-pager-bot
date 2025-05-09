@@ -70,7 +70,7 @@ const {
       await interaction.showModal(modal);
     }
   
-    if (interaction.isModalSubmit() && interaction.customId === 'modal_pager') {
+    if (interaction.customId === 'modal_pager') {
       const userId = interaction.user.id;
       const data = userSelections.get(userId);
   
@@ -91,52 +91,33 @@ const {
           { name: '📍 Ubicación', value: lugar, inline: true },
           { name: '📄 Situación', value: situacion, inline: false },
           { name: '🔔 Notificados', value: roleMentions || 'Ninguno', inline: false },
-          { name: '✅ Respondieron', value: 'Ninguno', inline: false }
+          { name: '✅ Respondieron', value: '*Nadie ha respondido aún.*', inline: false }
         )
         .setFooter({ text: `Enviado por ${interaction.member?.nickname || interaction.user.username}` })
         .setTimestamp();
   
-      const dummyId = 'pending_id'; // se sobreescribirá al enviar el mensaje
-  
       const buttons = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
-          .setCustomId(`responder_${dummyId}`)
+          .setCustomId('responder_pager')
           .setLabel('✅ Responder')
           .setStyle(ButtonStyle.Success),
         new ButtonBuilder()
-          .setCustomId(`cerrar_${dummyId}`)
+          .setCustomId('close_pager')
           .setLabel('📴 Cerrar Pager')
           .setStyle(ButtonStyle.Danger)
       );
   
-      const sent = await interaction.reply({
+      await interaction.reply({
         content: roleMentions,
         embeds: [embed],
         components: [buttons],
         allowedMentions: { parse: ['roles'] }
       });
   
-      const msg = await interaction.fetchReply();
-      const msgId = msg.id;
+      const sentMessage = await interaction.fetchReply();
+      console.log(`📨 PAGER enviado - ID: ${sentMessage.id}`);
   
-      // Actualizar botones con el mensaje ID real
-      const updatedButtons = new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-          .setCustomId(`responder_${msgId}`)
-          .setLabel('✅ Responder')
-          .setStyle(ButtonStyle.Success),
-        new ButtonBuilder()
-          .setCustomId(`cerrar_${msgId}`)
-          .setLabel('📴 Cerrar Pager')
-          .setStyle(ButtonStyle.Danger)
-      );
-  
-      await msg.edit({
-        embeds: [embed],
-        components: [updatedButtons]
-      });
-  
-      activePagers.set(msgId, {
+      activePagers.set(sentMessage.id, {
         embed,
         roles: data.roles,
         situacion,
@@ -144,50 +125,57 @@ const {
         estado,
         responders: []
       });
-  
-      userSelections.delete(userId);
     }
   
     if (interaction.isButton()) {
-      const [action, pagerId] = interaction.customId.split('_');
-      const pagerData = activePagers.get(pagerId);
+      console.log(`🖱️ Botón presionado: ${interaction.customId}`);
+      console.log(`📨 Mensaje ID: ${interaction.message.id}`);
+      console.log('📋 Pagers activos:', Array.from(activePagers.keys()));
   
+      const pagerData = activePagers.get(interaction.message.id);
       if (!pagerData) {
         return interaction.reply({ content: '⚠️ Este pager ya no está activo o no se encontró.', ephemeral: true });
       }
   
-      if (action === 'responder') {
+      if (interaction.customId === 'responder_pager') {
         if (!pagerData.responders.includes(interaction.user.id)) {
           pagerData.responders.push(interaction.user.id);
   
           pagerData.embed.spliceFields(4, 1, {
             name: '✅ Respondieron',
-            value: pagerData.responders.map(id => `<@${id}>`).join('\n')
+            value: pagerData.responders.map(id => `<@${id}>`).join('\n') || '*Nadie ha respondido aún.*'
           });
   
           await interaction.update({
             embeds: [pagerData.embed],
             components: interaction.message.components
           });
+  
+          console.log(`✅ Usuario ${interaction.user.tag} respondió al pager.`);
         } else {
           await interaction.reply({ content: 'Ya respondiste a este pager.', ephemeral: true });
         }
       }
   
-      if (action === 'cerrar') {
+      if (interaction.customId === 'close_pager') {
         pagerData.embed.setColor('Red');
-        pagerData.embed.spliceFields(0, 1, { name: '👮‍♂️ Estado', value: 'CERRADO', inline: true });
+        pagerData.embed.spliceFields(0, 1, {
+          name: '👮‍♂️ Estado',
+          value: 'CERRADO',
+          inline: true
+        });
   
         await interaction.update({
           embeds: [pagerData.embed],
           components: []
         });
   
-        activePagers.delete(pagerId);
+        activePagers.delete(interaction.message.id);
+        console.log(`🔒 Pager ${interaction.message.id} cerrado y eliminado.`);
       }
     }
   });
-  
+
   client.once('ready', () => {
     console.log(`✅ Bot iniciado como ${client.user.tag}`);
   });
