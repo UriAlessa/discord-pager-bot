@@ -1,0 +1,26 @@
+{
+  "SOD_SEB": {
+    "label": "SOD: SEB",
+    "id": "1234695752287260693"
+  },
+  "SUPERVISORES": {
+    "label": "Supervisor",
+    "id": "1234676131240869949"
+  },
+  "FIELD_STAFF": {
+    "label": "Field Staff",
+    "id": "1234675327872012328"
+  },
+  "DD_OSSB": {
+    "label": "DD: OSSB",
+    "id": "1237431911085899861"
+  },
+  "DD_MCB": {
+    "label": "DD: MCB",
+    "id": "1234694830416990320"
+  },
+  "TRAFFIC_DEPUTY": {
+    "label": "Traffic Deputy",
+    "id": "1258630700979064953"
+  }
+}
