@@ -53,13 +53,13 @@ const {
       const situacionInput = new TextInputBuilder()
         .setCustomId('situacion')
         .setLabel('Situación')
-        .setStyle(TextInputStyle.Short)
+        .setStyle(TextInputStyle.Paragraph)
         .setRequired(true);
   
       const lugarInput = new TextInputBuilder()
         .setCustomId('lugar')
         .setLabel('Ubicación')
-        .setStyle(TextInputStyle.Paragraph)
+        .setStyle(TextInputStyle.Short)
         .setRequired(true);
   
       modal.addComponents(
