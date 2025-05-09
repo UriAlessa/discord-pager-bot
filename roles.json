@@ -22,5 +22,9 @@
   "TRAFFIC_DEPUTY": {
     "label": "Traffic Deputy",
     "id": "1258630700979064953"
+  },
+  "TEST_ROLE": {
+    "label": "Test Role",
+    "id": "1336848905555415081"
   }
 }
